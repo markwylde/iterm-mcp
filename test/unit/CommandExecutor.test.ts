@@ -73,4 +73,57 @@ describe('CommandExecutor', () => {
     expect(escapedCommand).not.toContain('\t');
     expect(escapedCommand).not.toContain('\n');
   });
+
+  describe('session targeting', () => {
+    test('targets active session when no sessionId provided', async () => {
+      const executor = new CommandExecutor(mockExecPromiseFn);
+      await executor.executeCommand('test');
+
+      const calledWith = mockExecPromiseFn.mock.calls.find(call =>
+        call[0].includes('osascript') && call[0].includes('write text')
+      );
+      expect(calledWith[0]).toContain('current session of current window');
+    });
+
+    test('targets active session when sessionId is "active"', async () => {
+      const executor = new CommandExecutor(mockExecPromiseFn, 'active');
+      await executor.executeCommand('test');
+
+      const calledWith = mockExecPromiseFn.mock.calls.find(call =>
+        call[0].includes('osascript') && call[0].includes('write text')
+      );
+      expect(calledWith[0]).toContain('current session of current window');
+    });
+
+    test('targets specific session when sessionId is provided', async () => {
+      const executor = new CommandExecutor(mockExecPromiseFn, 'session-123');
+      await executor.executeCommand('test');
+
+      const calledWith = mockExecPromiseFn.mock.calls.find(call =>
+        call[0].includes('osascript') && call[0].includes('write text')
+      );
+      expect(calledWith[0]).toContain('if id of s is "session-123"');
+      expect(calledWith[0]).toContain('repeat with w in windows');
+    });
+
+    test('retrieves TTY for specific session', async () => {
+      const executor = new CommandExecutor(mockExecPromiseFn, 'session-456');
+      await executor.executeCommand('test');
+
+      const ttyCall = mockExecPromiseFn.mock.calls.find(call =>
+        call[0].includes('get tty') || call[0].includes('tty of s')
+      );
+      expect(ttyCall[0]).toContain('session-456');
+    });
+
+    test('checks processing status for specific session', async () => {
+      const executor = new CommandExecutor(mockExecPromiseFn, 'session-789');
+      await executor.executeCommand('test');
+
+      const processingCall = mockExecPromiseFn.mock.calls.find(call =>
+        call[0].includes('is processing')
+      );
+      expect(processingCall[0]).toContain('session-789');
+    });
+  });
 });

@@ -9,6 +9,8 @@ import {
 import CommandExecutor from "./CommandExecutor.js";
 import TtyOutputReader from "./TtyOutputReader.js";
 import SendControlCharacter from "./SendControlCharacter.js";
+import TerminalLister from "./TerminalLister.js";
+import TerminalCreator from "./TerminalCreator.js";
 
 const server = new Server(
   {
@@ -26,6 +28,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
+        name: "list_terminals",
+        description: "Lists all iTerm terminal sessions with their unique IDs, names, and TTY paths",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: []
+        }
+      },
+      {
+        name: "create_terminal",
+        description: "Creates a new iTerm terminal tab and returns its session ID",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: []
+        }
+      },
+      {
         name: "write_to_terminal",
         description: "Writes text to the active iTerm terminal - often used to run a command in the terminal",
         inputSchema: {
@@ -34,6 +54,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             command: {
               type: "string",
               description: "The command to run or text to write to the terminal"
+            },
+            sessionId: {
+              type: "string",
+              description: "The session ID to target. Use 'active' for the current session, or a specific session ID from list_terminals. Defaults to 'active'."
             },
           },
           required: ["command"]
@@ -49,6 +73,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "integer",
               description: "The number of lines of output to read."
             },
+            sessionId: {
+              type: "string",
+              description: "The session ID to target. Use 'active' for the current session, or a specific session ID from list_terminals. Defaults to 'active'."
+            },
           },
           required: ["linesOfOutput"]
         }
@@ -63,6 +91,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "The letter corresponding to the control character (e.g., 'C' for Control-C, ']' for telnet escape)"
             },
+            sessionId: {
+              type: "string",
+              description: "The session ID to target. Use 'active' for the current session, or a specific session ID from list_terminals. Defaults to 'active'."
+            },
           },
           required: ["letter"]
         }
@@ -73,15 +105,40 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   switch (request.params.name) {
+    case "list_terminals": {
+      const terminals = await TerminalLister.list();
+
+      const output = terminals.map(t =>
+        `${t.sessionId}\t${t.name}\t${t.cwd}\t${t.lastCommand}`
+      ).join('\n');
+
+      return {
+        content: [{
+          type: "text",
+          text: `Session ID\tTab Name\tWorking Directory\tLast Command\n${output}`
+        }]
+      };
+    }
+    case "create_terminal": {
+      const result = await TerminalCreator.create();
+
+      return {
+        content: [{
+          type: "text",
+          text: `Created new terminal with session ID: ${result.sessionId}`
+        }]
+      };
+    }
     case "write_to_terminal": {
-      let executor = new CommandExecutor();
+      const sessionId = request.params.arguments?.sessionId as string | undefined;
+      let executor = new CommandExecutor(undefined, sessionId);
       const command = String(request.params.arguments?.command);
-      const beforeCommandBuffer = await TtyOutputReader.retrieveBuffer();
+      const beforeCommandBuffer = await TtyOutputReader.retrieveBuffer(sessionId);
       const beforeCommandBufferLines = beforeCommandBuffer.split("\n").length;
-      
+
       await executor.executeCommand(command);
-      
-      const afterCommandBuffer = await TtyOutputReader.retrieveBuffer();
+
+      const afterCommandBuffer = await TtyOutputReader.retrieveBuffer(sessionId);
       const afterCommandBufferLines = afterCommandBuffer.split("\n").length;
       const outputLines = afterCommandBufferLines - beforeCommandBufferLines
 
@@ -94,7 +151,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
     case "read_terminal_output": {
       const linesOfOutput = Number(request.params.arguments?.linesOfOutput) || 25
-      const output = await TtyOutputReader.call(linesOfOutput)
+      const sessionId = request.params.arguments?.sessionId as string | undefined;
+      const output = await TtyOutputReader.call(linesOfOutput, sessionId)
 
       return {
         content: [{
@@ -104,10 +162,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
     case "send_control_character": {
-      const ttyControl = new SendControlCharacter();
+      const sessionId = request.params.arguments?.sessionId as string | undefined;
+      const ttyControl = new SendControlCharacter(sessionId);
       const letter = String(request.params.arguments?.letter);
       await ttyControl.send(letter);
-      
+
       return {
         content: [{
           type: "text",

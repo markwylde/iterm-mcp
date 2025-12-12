@@ -6,6 +6,10 @@ import SendControlCharacter from '../../src/SendControlCharacter.js';
 class MockSendControlCharacter extends SendControlCharacter {
   mockExecuteCommand = jest.fn();
 
+  constructor(sessionId?: string) {
+    super(sessionId);
+  }
+
   protected async executeCommand(command: string): Promise<void> {
     this.mockExecuteCommand(command);
     return Promise.resolve();
@@ -79,10 +83,49 @@ describe('SendControlCharacter', () => {
     sendControlCharacter.mockExecuteCommand.mockImplementation(() => {
       throw new Error('Command execution failed');
     });
-    
+
     // Act & Assert
     await expect(sendControlCharacter.send('C')).rejects.toThrow(
       'Failed to send control character: Command execution failed'
     );
+  });
+
+  describe('session targeting', () => {
+    test('should target active session when no sessionId provided', async () => {
+      const ctrl = new MockSendControlCharacter();
+      await ctrl.send('C');
+
+      expect(ctrl.mockExecuteCommand).toHaveBeenCalledWith(
+        expect.stringContaining('current session of current tab')
+      );
+    });
+
+    test('should target active session when sessionId is "active"', async () => {
+      const ctrl = new MockSendControlCharacter('active');
+      await ctrl.send('C');
+
+      expect(ctrl.mockExecuteCommand).toHaveBeenCalledWith(
+        expect.stringContaining('current session of current tab')
+      );
+    });
+
+    test('should target specific session when sessionId is provided', async () => {
+      const ctrl = new MockSendControlCharacter('session-123');
+      await ctrl.send('C');
+
+      const calledWith = ctrl.mockExecuteCommand.mock.calls[0][0];
+      expect(calledWith).toContain('if id of s is "session-123"');
+      expect(calledWith).toContain('repeat with w in windows');
+    });
+
+    test('should iterate through all sessions to find specific session', async () => {
+      const ctrl = new MockSendControlCharacter('my-session-id');
+      await ctrl.send('Z');
+
+      const calledWith = ctrl.mockExecuteCommand.mock.calls[0][0];
+      expect(calledWith).toContain('repeat with t in tabs of w');
+      expect(calledWith).toContain('repeat with s in sessions of t');
+      expect(calledWith).toContain('my-session-id');
+    });
   });
 });

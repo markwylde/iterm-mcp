@@ -22,9 +22,23 @@ A Model Context Protocol server that provides access to your iTerm session.
 * For multi-step tasks, you may need to interrupt the model if it goes off track. Start with smaller, focused tasks until you're familiar with how the model behaves. 
 
 ### Tools
-- `write_to_terminal` - Writes to the active iTerm terminal, often used to run a command. Returns the number of lines of output produced by the command.
-- `read_terminal_output` - Reads the requested number of lines from the active iTerm terminal.
-- `send_control_character` - Sends a control character to the active iTerm terminal.
+
+**Terminal Management**
+- `list_terminals` - Lists all iTerm terminal sessions with their unique IDs, names, working directories, and last commands.
+- `create_terminal` - Creates a new iTerm terminal tab and returns its session ID.
+
+**Terminal Interaction**
+- `write_to_terminal` - Writes to an iTerm terminal, often used to run a command. Returns the number of lines of output produced by the command. Supports targeting specific sessions via `sessionId`.
+- `read_terminal_output` - Reads the requested number of lines from an iTerm terminal. Supports targeting specific sessions via `sessionId`.
+- `send_control_character` - Sends a control character to an iTerm terminal (e.g., Ctrl+C, Ctrl+Z). Supports targeting specific sessions via `sessionId`.
+
+**Session Targeting**
+
+All terminal interaction tools support an optional `sessionId` parameter:
+- Omit or use `"active"` to target the currently active terminal session
+- Use a specific session ID (from `list_terminals`) to target a particular terminal
+
+This allows the model to work with multiple terminal sessions simultaneously.
 
 ### Requirements
 
