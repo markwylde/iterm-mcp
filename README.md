@@ -31,6 +31,7 @@ A Model Context Protocol server that provides access to your iTerm session.
 - `write_to_terminal` - Writes to an iTerm terminal, often used to run a command. Returns the number of lines of output produced by the command. Supports targeting specific sessions via `sessionId`.
 - `read_terminal_output` - Reads the requested number of lines from an iTerm terminal. Supports targeting specific sessions via `sessionId`.
 - `send_control_character` - Sends a control character to an iTerm terminal (e.g., Ctrl+C, Ctrl+Z). Supports targeting specific sessions via `sessionId`.
+- `search_terminal_output` - Searches terminal output for lines matching a query string. Returns matching lines with their line numbers. Supports `maxResults` to limit the number of matches returned (defaults to 50). Supports targeting specific sessions via `sessionId`.
 
 **Session Targeting**
 

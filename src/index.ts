@@ -98,6 +98,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["letter"]
         }
+      },
+      {
+        name: "search_terminal_output",
+        description: "Searches the terminal output for lines matching a query string and returns matching lines with their line numbers",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "The search query string to find in terminal output"
+            },
+            sessionId: {
+              type: "string",
+              description: "The session ID to target. Use 'active' for the current session, or a specific session ID from list_terminals. Defaults to 'active'."
+            },
+            maxResults: {
+              type: "integer",
+              description: "Maximum number of matching lines to return. Defaults to 50."
+            }
+          },
+          required: ["query"]
+        }
       }
     ]
   };
@@ -171,6 +193,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [{
           type: "text",
           text: `Sent control character: Control-${letter.toUpperCase()}`
+        }]
+      };
+    }
+    case "search_terminal_output": {
+      const sessionId = request.params.arguments?.sessionId as string | undefined;
+      const query = String(request.params.arguments?.query);
+      const maxResults = Number(request.params.arguments?.maxResults) || 50;
+
+      const buffer = await TtyOutputReader.retrieveBuffer(sessionId);
+      const lines = buffer.split('\n');
+      const matches: string[] = [];
+
+      for (let i = 0; i < lines.length && matches.length < maxResults; i++) {
+        if (lines[i].toLowerCase().includes(query.toLowerCase())) {
+          matches.push(`${i + 1}: ${lines[i]}`);
+        }
+      }
+
+      if (matches.length === 0) {
+        return {
+          content: [{
+            type: "text",
+            text: `No matches found for "${query}"`
+          }]
+        };
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: `Found ${matches.length} match(es) for "${query}":\n\n${matches.join('\n')}`
         }]
       };
     }
